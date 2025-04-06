@@ -12,26 +12,16 @@ Welcome
 - The interface of the model has been written and successfully tested on the processed TaxiNYC data. 
 - However, this processed TaxiNYC data can not be used directly in the project because we have to perform data preprocessing on our own.
 
+## Progress on 2025-04-06
+- Data cleaning and preparation are finished. Now the data can be transformed to required format from .parquet files via `data\data_preparation.py`
+- Main function (in `experimentTaxiNYC.py`) is modified for future experiment.
+
 ## How to run this model
 - Create an anaconda environment by `environment.yml`
 - run `experimentTaxiNYC.py`
 
-## Required data format after preprocessing
-- The required data format is exactly the same as `d_map.npy` (dropoff map) and `p_map.npy` (pickup map)
-- They are arrays in shape of (n, 32, 32), where 
-  - `n=days * 24 / Time Interval`, time interval is a period of time (e.g., one hour)
-  - 32 is the grid size. New York is divided into a grid map.
-  - The value is the pickup/dropoff demand accumulated in that time interval
-- You can load the data and visualize it by: (The darker the color, the higher the demand) 
-```bash
-arr2 = np.load('p_map.npy')
-print(arr2.shape)
-
-plt.imshow(arr2[0][0], cmap='Reds')
-plt.show() 
-```
 
 ## Things to be done
-- Clean the origin GPS data (maybe from July 1st 2014 to June 30th 2016) and prepare it to the format specified above. (with the help of https://github.com/Lab-Work/gpsresilience)
-- Write code of ARIMA for comparison
-- I could start writing the report now. And I hope the data cleaning and preparation could be done in two days?
+- Write code of ARIMA for comparison.
+- Change hyperparameters to see the influence of trend, period, closeness and number of residual units.
+- I will start writing the report 
