@@ -159,14 +159,14 @@ def get_sequential_data(len_closeness, len_period, len_trend):
     if os.path.exists("data/pickup_counts.npy") is False or os.path.exists("data/dropoff_counts.npy") is False:
         get_concatenate_data()
 
-    # 读取pickup和dropoff数据，并组合成一个数组，形状为 (time, 2, 32, 32)
+    # stack pickup & dropoff records together
     pickup_data = np.load("data/pickup_counts.npy")
     dropoff_data = np.load("data/dropoff_counts.npy")
     dropoff_data = dropoff_data[0:pickup_data.shape[0]]
     data2d = np.stack([pickup_data, dropoff_data], axis=1)
 
     mmn = MinMaxNormalization()
-    T = 24  # 一天内的时间步数
+    T = 24  # number of time intervals in one day
     train_st = 200
     train_ed = 2600
     test_st = 2600
@@ -176,21 +176,21 @@ def get_sequential_data(len_closeness, len_period, len_trend):
     Y_train = data_set[train_st:train_ed]
     Y_test = data_set[test_st:test_ed]
 
-    # 构造训练数据
+    # Construct train data
     Xc = []
     Xp = []
     Xt = []
     for i in range(train_st, train_ed):
-        # Xc: 最近 len_closeness 个时间步的数据堆叠
+        # closeness
         Xc_unit = np.vstack([data_set[i - j] for j in range(len_closeness, 0, -1)])
         Xc.append(Xc_unit)
-        # Xp: 周期性依赖数据：按照一天周期，取前 len_period 个相应时间步
+        # period
         if len_period > 0:
             Xp_unit = np.vstack([data_set[i - T * k] for k in range(len_period, 0, -1)])
         else:
             Xp_unit = None
         Xp.append(Xp_unit)
-        # Xt: 趋势依赖数据：按照一周周期（T*7）取前 len_trend 个相应时间步
+        # trend
         if len_trend > 0:
             Xt_unit = np.vstack([data_set[i - T * 7 * k] for k in range(len_trend, 0, -1)])
         else:
@@ -203,7 +203,7 @@ def get_sequential_data(len_closeness, len_period, len_trend):
     ext = np.zeros([train_ed - train_st, 28])
     X_train = [Xc, Xp, Xt, ext]
 
-    # 构造测试数据
+    # construct test data
     Xc = []
     Xp = []
     Xt = []
