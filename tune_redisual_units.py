@@ -2,10 +2,24 @@ import torch
 from torch.utils.data import TensorDataset, DataLoader
 import numpy as np
 import gc
+import random
 import logging
 from tqdm import tqdm
 from data.data_preparation import get_sequential_data
 from model.STResNet import STResNet
+import matplotlib.pyplot as plt
+
+# Set random seed for reproducibility
+def set_seed(seed=42):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+set_seed(42)
 
 # Enable logging
 logging.basicConfig(level=logging.INFO, format='%(levelname)s - %(message)s')
@@ -25,7 +39,7 @@ len_trend = 1
 map_height, map_width = 32, 32
 nb_flow = 2
 lr = 0.0002
-residual_unit_range = [6, 7, 8, 9]
+residual_unit_range = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
 
 # Load data
 logging.info("Loading data...")
@@ -79,7 +93,24 @@ for nb_residual_unit in tqdm(residual_unit_range, desc="Tuning Residual Units"):
     torch.cuda.empty_cache()
     gc.collect()
 
-# Output results
+# Outputing results
 print("\nHyperparameter tuning results:")
 for nb_residual_unit, result in results.items():
     print(f"Residual Units: {nb_residual_unit} -> Eval: {result}")
+
+# Extracting RMSE and MAE from the results
+res_units = list(results.keys())
+rmse_values = [results[k][0].item() for k in res_units]
+mae_values = [results[k][1].item() for k in res_units]
+
+# Plotting
+plt.figure(figsize=(10, 5))
+plt.plot(res_units, rmse_values, marker='o', label='RMSE')
+plt.plot(res_units, mae_values, marker='s', label='MAE')
+plt.xlabel('Number of Residual Units')
+plt.ylabel('Error')
+plt.title('RMSE and MAE vs. Number of Residual Units')
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
