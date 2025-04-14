@@ -23,8 +23,9 @@ def forecast_grid(model_class, train_data, forecast_period, alpha_range, theta_r
             model = model_class(cell_data)
             
             # Grid search for optimal parameters
-            best_params, _ = model.grid_search(alpha_range, theta_range, metric='MAE')
-            model.alpha, model.theta = best_params
+            #best_params, _ = model.grid_search(alpha_range, theta_range, metric='MAE')
+            #model.alpha, model.theta = best_params
+            model.alpha, model.theta = 0.1, 0.05
             model.run_model()
 
             # Forecast for the given period
@@ -49,7 +50,7 @@ def main():
     pickup_data = np.load(r'data\pickup_counts.npy')    # (n, 32, 32)
 
     # Define the training and testing indices
-    forecast_hours = 4  # Maximum forecast period of 4 hours
+    forecast_hours = 2  # Maximum forecast period of 4 hours
     T = 24  # number of time intervals in one day
     train_st = 0
     train_end = test_st = (train_st + 240)
