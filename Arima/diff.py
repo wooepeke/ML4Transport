@@ -86,7 +86,7 @@ def main():
     # Define the training and testing indices
     forecast_hours = 2  # Maximum forecast period of 4 hours
     T = 24  # number of time intervals in one day
-    train_st = 0
+    train_st = 3601 - 240
     train_end = test_st = (train_st + 240)
     test_end = test_st + forecast_hours
 
@@ -149,10 +149,11 @@ def main():
 
     for i, label in enumerate(row_labels):
         axs[i, 0].set_ylabel(label, fontsize=12, rotation=90, labelpad=10)
-
+    
+    output_folder = "Arima\images"
     # Add a big title
     fig.suptitle("Forecast vs Actual Heatmaps with Differences", fontsize=20)
-    plt.savefig(f"forecast_vs_actual_with_differences {forecast_hours} hours.png", dpi=300, bbox_inches='tight')
+    plt.savefig(f"{output_folder}/forecast_vs_actual_with_differences_{forecast_hours}_hours.png", dpi=300, bbox_inches='tight')
 
     # Create a separate figure focusing just on the differences
     fig_diff, axs_diff = plt.subplots(2, forecast_hours, figsize=(4 * forecast_hours, 8), constrained_layout=True)
@@ -171,7 +172,6 @@ def main():
     axs_diff[1, 0].set_ylabel("Pickup", fontsize=12)
 
     fig_diff.suptitle("Forecast Error Heatmaps (Forecast - Actual)", fontsize=20)
-    output_folder = "Arima\images"
     plt.savefig(f"{output_folder}/forecast_error_heatmaps_{forecast_hours}_hours.png", dpi=300, bbox_inches='tight')
 
 if __name__ == "__main__":
