@@ -4,36 +4,51 @@ import pandas as pd
 from Arima import Arima
 from tqdm import tqdm
 from matplotlib.colors import PowerNorm, TwoSlopeNorm
+import json
+import os
 
 np.random.seed(42)
 
 
-def forecast_grid(model_class, train_data, forecast_period, alpha_range, theta_range):
+def forecast_grid(model_class, train_data, forecast_period, alpha_range, theta_range, name):
     """
     Forecast demand for all grid cells using the given ARIMA model.
     Capping negative forecasted values at 0.
     """
     forecast_grid = np.zeros((32, 32, forecast_period))  # Initialize the grid for predictions
-
+    model = model_class()
     for i in tqdm(range(32)):
         for j in range(32):
             # Extract data for the current grid cell
             cell_data = train_data[:, i, j]
 
-            # Initialize and fit ARIMA model
-            model = model_class(cell_data)
-
             # Grid search for optimal parameters
             # best_params, _ = model.grid_search(alpha_range, theta_range, metric='MAE')
             # model.alpha, model.theta = best_params
             model.alpha, model.theta = 0.1, 0.05
-            model.run_model()
+            model.run_model(cell_data)
 
             # Forecast for the given period
             forecast_values = model.forecast_test_period(forecast_period)
 
             # Cap any negative forecast values at 0
             forecast_grid[i, j, :] = np.maximum(forecast_values, 0)
+
+    pixel_mae, pixel_rmse = model.MAEs, model.RMSEs
+    total_mae, total_rmse = model.compute_full_metrics()
+
+    data = {
+        "pixel_mae":pixel_mae,
+        "pixel_rmse":pixel_rmse,
+        "total_mae":total_mae,
+        "total_rmse":total_rmse
+    }
+    
+    output_folder = "Arima\metrics"
+    os.makedirs(output_folder, exist_ok=True)
+
+    with open(f"{output_folder}/forecast_data_{name}.json", "w") as f:
+        json.dump(data, f, indent=4)
 
     return forecast_grid
 
@@ -69,7 +84,7 @@ def main():
     pickup_data = np.load(r'data\pickup_counts.npy')  # (n, 32, 32)
 
     # Define the training and testing indices
-    forecast_hours = 8  # Maximum forecast period of 4 hours
+    forecast_hours = 2  # Maximum forecast period of 4 hours
     T = 24  # number of time intervals in one day
     train_st = 0
     train_end = test_st = (train_st + 240)
@@ -83,13 +98,13 @@ def main():
     alpha_range = np.linspace(0.1, 0.9, 50)
     theta_range = np.linspace(0.1, 0.9, 50)
 
-    forecast_dropoff_grid = forecast_grid(Arima, dropoff_train, forecast_hours, alpha_range, theta_range)
+    forecast_dropoff_grid = forecast_grid(Arima, dropoff_train, forecast_hours, alpha_range, theta_range, "dropoff")
 
     # --- Pickup Forecast ---
     print("\nOptimizing Pickup model...")
     pickup_train = pickup_data[train_st:train_end]
 
-    forecast_pickup_grid = forecast_grid(Arima, pickup_train, forecast_hours, alpha_range, theta_range)
+    forecast_pickup_grid = forecast_grid(Arima, pickup_train, forecast_hours, alpha_range, theta_range, "pickup")
 
     # --- Extract actual test data (ground truth) ---
     dropoff_actual = dropoff_data[test_st:test_end]
@@ -156,8 +171,8 @@ def main():
     axs_diff[1, 0].set_ylabel("Pickup", fontsize=12)
 
     fig_diff.suptitle("Forecast Error Heatmaps (Forecast - Actual)", fontsize=20)
-    plt.savefig(f"forecast_error_heatmaps {forecast_hours} hours.png", dpi=300, bbox_inches='tight')
-
+    output_folder = "Arima\images"
+    plt.savefig(f"{output_folder}/forecast_error_heatmaps_{forecast_hours}_hours.png", dpi=300, bbox_inches='tight')
 
 if __name__ == "__main__":
     main()

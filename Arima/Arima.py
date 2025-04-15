@@ -6,19 +6,21 @@ from tqdm import tqdm
 
 np.random.seed(42)
 
-
 class Arima():
-    def __init__(self, data, alpha=0.7, theta=0.5):
-        self.data = data
+    def __init__(self, alpha=0.7, theta=0.5):
         self.alpha = alpha
         self.theta = theta
         self.residuals = [0]
         self.predictions = []
         self.ts = None
         self.forecasted_full = None
+        self.MAEs = []
+        self.RMSEs = []
+        self.y_trues = []
+        self.y_preds = []
 
-    def run_model(self):
-        self.ts = pd.Series(self.data)
+    def run_model(self, data):
+        self.ts = pd.Series(data)
         diff = self.ts.diff().dropna()  # Differencing the data (to make it stationary)
         mu = diff.mean()
 
@@ -41,6 +43,10 @@ class Arima():
         forecasted_cumsum = forecasted.cumsum()
         self.forecasted_full = self.ts.iloc[0] + forecasted_cumsum
 
+        _, mae, rmse = self.compute_metrics()
+        self.MAEs.append(mae)
+        self.RMSEs.append(rmse)
+
         return self.forecasted_full
 
     def compute_metrics(self):
@@ -51,11 +57,23 @@ class Arima():
         y_true = self.ts.iloc[2:]
         y_pred = self.forecasted_full
 
+        self.y_trues.append(y_true)
+        self.y_preds.append(y_pred)
+
         mae = mean_absolute_error(y_true, y_pred)
         mse = mean_squared_error(y_true, y_pred)
         rmse = np.sqrt(mse)
 
-        return {'MAE': mae, 'MSE': mse, 'RMSE': rmse}
+        return {'MAE': mae, 'MSE': mse, 'RMSE': rmse}, mae, rmse
+
+    def compute_full_metrics(self):
+        all_y_true = np.concatenate(self.y_trues)
+        all_y_pred = np.concatenate(self.y_preds)
+
+        total_mae = mean_absolute_error(all_y_true, all_y_pred)
+        total_rmse = np.sqrt(mean_squared_error(all_y_true, all_y_pred))
+
+        return total_mae, total_rmse
 
     def grid_search(self, alpha_range, theta_range, metric='MAE'):
         best_score = float('inf')
