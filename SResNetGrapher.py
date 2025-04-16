@@ -7,35 +7,15 @@ from model import STResNet  # Import the STResNet model
 import os
 
 def load_data(path, is_pickup=True):
-    """
-    Load either pickup or dropoff data from the specified path
-    """
     data_type = "pickup" if is_pickup else "dropoff"
     return np.load(f"{path}/{data_type}_counts.npy")
 
 def prepare_stresnet_data(data, region_i, region_j, len_closeness, len_period, len_trend, T=24):
-    """
-    Prepare data for STResNet model in the format it expects
-    
-    Args:
-        data: The full data array
-        region_i, region_j: The region indices to extract
-        len_closeness: Number of recent time steps
-        len_period: Number of daily period time steps
-        len_trend: Number of weekly trend time steps
-        T: Number of time intervals in a day (default 24)
-    
-    Returns:
-        Processed data for the specified region
-    """
     # Extract data for the specific region
     region_data = data[:, region_i, region_j]
     return region_data
 
 def generate_sequences(data, seq_len, batch_size=32):
-    """
-    Generate training sequences from the data
-    """
     input_seqs = []
     target_seqs = []
     
@@ -54,9 +34,6 @@ def generate_sequences(data, seq_len, batch_size=32):
 
 def grid_search(model_class, batch_sizes, learning_rates, residual_units, data, 
                 map_height, map_width, len_closeness, len_period, len_trend, external_dim=28):
-    """
-    Grid search for optimal STResNet parameters
-    """
     best_score = float('inf')
     best_params = (None, None, None)  # batch_size, learning_rate, nb_residual_unit
     
@@ -146,11 +123,6 @@ def main():
         batch_size = 32
         lr = 0.0001
         res_units = 2
-    
-    # For simulation purposes, we'll create mock predictions
-    # In a real implementation, you would:
-    # 1. Create and train the STResNet model
-    # 2. Generate actual predictions using the trained model
     
     # Mock forecasts for visualization
     # Normally you would use the trained model to generate these
@@ -280,9 +252,6 @@ def main():
 
 
 class STResNetGrapher:
-    """
-    A class to handle training, evaluation, and visualization of STResNet models
-    """
     def __init__(self, data_dir='data', region_i=1, region_j=0):
         self.data_dir = data_dir
         self.region_i = region_i
@@ -319,9 +288,6 @@ class STResNetGrapher:
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     
     def prepare_data(self, train_st, train_end, test_end):
-        """
-        Prepare training and testing data
-        """
         test_st = train_end
         
         # Training data
@@ -337,9 +303,6 @@ class STResNetGrapher:
         return (dropoff_train, dropoff_test), (pickup_train, pickup_test), (ext_train, ext_test), (train_st, train_end, test_st, test_end)
     
     def create_model(self, model_type='dropoff'):
-        """
-        Create a STResNet model
-        """
         model = STResNet(
             learning_rate=self.learning_rate,
             epoches=self.epochs,
@@ -359,20 +322,6 @@ class STResNetGrapher:
         return model.to(self.device) if torch.cuda.is_available() else model
     
     def prepare_stresnet_input(self, data, ext_data):
-        """
-        Convert data to the format expected by STResNet
-        This is a simplified version - a real implementation would need to properly 
-        create the closeness, period, and trend sequences
-        """
-        # In a real implementation, you would:
-        # 1. Create closeness sequences (recent time steps)
-        # 2. Create period sequences (daily pattern)
-        # 3. Create trend sequences (weekly pattern)
-        # 4. Process external factors
-        
-        # For this example, we'll create a simplified representation
-        # Real implementation would be more complex
-        
         xc = torch.zeros((len(data) - self.len_closeness, self.len_closeness * 2, self.map_height, self.map_width))
         xp = torch.zeros((len(data) - self.len_closeness, self.len_period * 2, self.map_height, self.map_width))
         xt = torch.zeros((len(data) - self.len_closeness, self.len_trend * 2, self.map_height, self.map_width))
@@ -390,9 +339,6 @@ class STResNetGrapher:
         return xc, xp, xt, ext, y
     
     def train_models(self, train_st=500, train_end=548, test_end=552):
-        """
-        Train both dropoff and pickup models
-        """
         # Prepare data
         (dropoff_train, dropoff_test), (pickup_train, pickup_test), (ext_train, ext_test), _ = self.prepare_data(train_st, train_end, test_end)
         
@@ -419,10 +365,6 @@ class STResNetGrapher:
         }
     
     def generate_forecasts(self, dropoff_test, pickup_test):
-        """
-        Generate forecasts for test data
-        In a real implementation, this would use the trained models
-        """
         # For this example, we'll create mock forecasts
         # In a real implementation, you would use the trained models to generate predictions
         forecast_dropoff_test = dropoff_test * 0.9 + np.random.randn(len(dropoff_test)) * 0.5
@@ -439,9 +381,6 @@ class STResNetGrapher:
         }
     
     def plot_results(self, train_st=500, train_end=548, test_end=552):
-        """
-        Plot the results similar to the ArimaGrapher
-        """
         # Prepare data
         (dropoff_train, dropoff_test), (pickup_train, pickup_test), (ext_train, ext_test), (train_st, train_end, test_st, test_end) = self.prepare_data(train_st, train_end, test_end)
         
@@ -477,6 +416,7 @@ class STResNetGrapher:
         axs[0].set_ylabel('Dropoff Count')
         axs[0].legend()
         axs[0].grid(True, alpha=0.3)
+        axs[0].legend(loc='upper left')
 
         # Pickup Forecast Plot
         # Training data
@@ -516,7 +456,8 @@ class STResNetGrapher:
         pickup_text = f"Test Metrics:\nMAE: {metrics['pickup']['MAE']:.2f}\nRMSE: {metrics['pickup']['RMSE']:.2f}"
         axs[1].text(0.02, 0.05, pickup_text, transform=axs[1].transAxes, 
                    bbox=dict(facecolor='white', alpha=0.8, boxstyle='round'))
-        
+        axs[1].legend(loc='upper left')
+
         # New subplot: Zoomed-in view of the last 20 timesteps of training + test period
         axs[2].set_title('Zoomed View: Last 20 Training Steps + Test Period')
         axs[2].set_xlabel('Time')
@@ -553,7 +494,7 @@ class STResNetGrapher:
             
         # Adjust layout
         model_str = f"STResNet (ResUnits={self.nb_residual_unit}, C={self.len_closeness}, P={self.len_period}, T={self.len_trend})"
-        plt.suptitle(f"{model_str} Model with Test Period Forecast")
+        # plt.suptitle(f"{model_str} Model with Test Period Forecast")
         plt.tight_layout()
         plt.subplots_adjust(top=0.95, hspace=0.3)  # Adjust space for title and between subplots
         

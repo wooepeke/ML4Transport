@@ -54,6 +54,8 @@ def main():
     dropoff_fitted = dropoff_model.fit(dropoff_train)
     dropoff_forecast = dropoff_model.forecast(test_period_length)
 
+    print(dropoff_model.evaluate())
+
     # --- PICK-UP MODEL ---
     print("\nOptimizing Pickup model...")
     pickup_train = pickup_data[train_st:train_end]
@@ -65,11 +67,7 @@ def main():
     pickup_fitted = pickup_model.fit(pickup_train)
     pickup_forecast = pickup_model.forecast(test_period_length)
 
-    # --- Evaluation on Test Data ---
-    dropoff_mae = mean_absolute_error(dropoff_test, dropoff_forecast)
-    dropoff_rmse = np.sqrt(mean_squared_error(dropoff_test, dropoff_forecast))
-    pickup_mae = mean_absolute_error(pickup_test, pickup_forecast)
-    pickup_rmse = np.sqrt(mean_squared_error(pickup_test, pickup_forecast))
+    print(pickup_model.evaluate())
 
     # --- Plotting ---
     fig, axs = plt.subplots(3, 1, figsize=(12, 10), gridspec_kw={'height_ratios': [1, 1, 1]})
@@ -82,6 +80,7 @@ def main():
     axs[0].set_title(f'Dropoff Forecast - ARIMA(1,0,1)')
     axs[0].legend()
     axs[0].grid(True, alpha=0.3)
+    axs[0].legend(loc='upper left')
 
     # Pickup plot
     axs[1].plot(range(train_st, train_end), pickup_train, label='Training Data', color='blue')
@@ -91,14 +90,15 @@ def main():
     axs[1].set_title(f'Pickup Forecast - ARIMA(1,0,1)')
     axs[1].legend()
     axs[1].grid(True, alpha=0.3)
+    axs[1].legend(loc='upper left')
 
     # New subplot: Zoomed-in view of the last 20 timesteps of training + test period
     axs[2].set_title('Zoomed View: Last 20 Training Steps + Test Period')
     axs[2].set_xlabel('Time')
     
     # Define the zoom window
-    zoom_start = train_end - 20  # Last 20 timesteps of training
-    zoom_end = test_end  # Including all test data
+    zoom_start = train_end - 20
+    zoom_end = test_end
     
     axs[2].plot(range(zoom_start, train_end), dropoff_data[zoom_start:train_end], label='Dropoff Training', color='blue', alpha=0.6)
     axs[2].plot(range(test_st, test_end), dropoff_test, label='Dropoff Test', color='blue')
@@ -114,7 +114,7 @@ def main():
 
     plt.tight_layout()
     plt.subplots_adjust(top=0.95)
-    plt.suptitle(f'ARIMA Forecasts (Dropoff & Pickup)', fontsize=14)
+    # plt.suptitle(f'ARIMA Forecasts (Dropoff & Pickup)', fontsize=14)
     plt.show()
 
 if __name__ == "__main__":

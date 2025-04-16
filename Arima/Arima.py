@@ -32,7 +32,7 @@ class Arima:
     def fit(self, series):
         self.ts = pd.Series(series)
         self.diff_ts = self.difference(self.ts, self.d)
-
+        print(len(self.diff_ts))
         n = len(self.diff_ts)
         fitted = []
         self.residuals = []
