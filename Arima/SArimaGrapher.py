@@ -28,7 +28,7 @@ def grid_search(model_class,
                                 model = model_class(p=p, d=d, q=q, 
                                                     P=P, D=D, Q=Q, s=seasonal_period)
                                 model.fit(data)
-                                score = model.evaluate()[metric]
+                                score = model.evaluate(model.fitted_values, model.diff_ts.iloc[max(model.p, model.q, model.P * model.s, model.Q * model.s):])[metric]
 
                                 if score < best_score:
                                     best_score = score
@@ -41,16 +41,15 @@ def grid_search(model_class,
     print(f"Best {metric}: {best_score:.4f}")
     return best_model, best_params, best_score
 
-
-
 def main():
     # --- Load Data ---
     dropoff_data = np.load(r'data\dropoff_counts.npy')[:, 1, 0]
     pickup_data = np.load(r'data\pickup_counts.npy')[:, 1, 0]
 
     forecast_hours = 24
-    train_st = 500
-    train_end = test_st = train_st + 240
+    training_length = 2400
+    train_st = 200
+    train_end = test_st = training_length + train_st
     test_end = test_st + forecast_hours
     test_period_length = test_end - test_st
 
@@ -89,6 +88,8 @@ def main():
     dropoff_fitted = dropoff_model.fit(dropoff_train)
     dropoff_forecast = dropoff_model.forecast(test_period_length)
 
+    print(dropoff_model.evaluate(dropoff_forecast, dropoff_test))
+
     # --- PICK-UP MODEL ---
     print("\nOptimizing Pickup model...")
     pickup_train = pickup_data[train_st:train_end]
@@ -108,40 +109,37 @@ def main():
         metric='MAE'
     )
 
-    # pickup_model = Sarima(p=1, d=0, q=0)  # Try d=0 first
     pickup_model.ts = pd.Series(pickup_train)
     pickup_model.check_stationarity()  # Check stationarity
     pickup_fitted = pickup_model.fit(pickup_train)
     pickup_forecast = pickup_model.forecast(test_period_length)
 
-    # --- Evaluation on Test Data ---
-    dropoff_mae = mean_absolute_error(dropoff_test, dropoff_forecast)
-    dropoff_rmse = np.sqrt(mean_squared_error(dropoff_test, dropoff_forecast))
-    pickup_mae = mean_absolute_error(pickup_test, pickup_forecast)
-    pickup_rmse = np.sqrt(mean_squared_error(pickup_test, pickup_forecast))
+    print(pickup_model.evaluate(pickup_forecast, pickup_test))
 
     # --- Plotting ---
     fig, axs = plt.subplots(3, 1, figsize=(10, 10), gridspec_kw={'height_ratios': [1, 1, 1]})
 
+    # Define how many steps to show
+    zoom_len = 264
+
     # Dropoff plot
-    axs[0].plot(range(train_st, train_end), dropoff_train, label='Training Data', color='blue')
-    axs[0].plot(dropoff_model.fitted_values.index + train_st, dropoff_model.fitted_values, label='Model Fit', color='green', linestyle='--')
-    axs[0].plot(range(test_st, test_end), dropoff_test, label='Test Data', color='orange')
-    axs[0].plot(range(test_st, test_end), dropoff_forecast, label='Forecast', color='purple', linestyle='-.')
-    axs[0].set_title(f'Dropoff Forecast - Sarima(1,0,1,1,0,0,24)')
-    axs[0].legend()
-    axs[0].grid(True, alpha=0.3)
+    axs[0].plot(range(train_st, train_end)[-zoom_len:], dropoff_train[-zoom_len:], label='Training Data', color='blue')
+    axs[0].plot(dropoff_model.fitted_values.index[-zoom_len:] + train_st, dropoff_model.fitted_values[-zoom_len:], label='Model Fit', color='green', linestyle='--')
+    axs[0].plot(range(test_st, test_end)[-zoom_len:], dropoff_test[-zoom_len:], label='Test Data', color='orange')
+    axs[0].plot(range(test_st, test_end)[-zoom_len:], dropoff_forecast[-zoom_len:], label='Forecast', color='purple', linestyle='-.')
+    axs[0].set_title(f'Dropoff Forecast 264/{training_length + test_period_length} timesteps- Sarima(1,0,1,1,0,0,24)')
     axs[0].legend(loc='upper left')
+    axs[0].grid(True, alpha=0.3)
 
     # Pickup plot
-    axs[1].plot(range(train_st, train_end), pickup_train, label='Training Data', color='blue')
-    axs[1].plot(pickup_model.fitted_values.index + train_st, pickup_model.fitted_values, label='Model Fit', color='green', linestyle='--')
-    axs[1].plot(range(test_st, test_end), pickup_test, label='Test Data', color='orange')
-    axs[1].plot(range(test_st, test_end), pickup_forecast, label='Forecast', color='purple', linestyle='-.')
-    axs[1].set_title(f'Pickup Forecast - Sarima(1,0,1,1,0,0,24)')
-    axs[1].legend()
-    axs[1].grid(True, alpha=0.3)
+    axs[1].plot(range(train_st, train_end)[-zoom_len:], pickup_train[-zoom_len:], label='Training Data', color='blue')
+    axs[1].plot(pickup_model.fitted_values.index[-zoom_len:] + train_st, pickup_model.fitted_values[-zoom_len:], label='Model Fit', color='green', linestyle='--')
+    axs[1].plot(range(test_st, test_end)[-zoom_len:], pickup_test[-zoom_len:], label='Test Data', color='orange')
+    axs[1].plot(range(test_st, test_end)[-zoom_len:], pickup_forecast[-zoom_len:], label='Forecast', color='purple', linestyle='-.')
+    axs[1].set_title(f'Pickup Forecast 264/{training_length + test_period_length} timesteps - Sarima(1,0,1,1,0,0,24)')
     axs[1].legend(loc='upper left')
+    axs[1].grid(True, alpha=0.3)
+
 
     # New subplot: Zoomed-in view of the last 20 timesteps of training + test period
     axs[2].set_title('Zoomed View: Last 20 Training Steps + Test Period')
@@ -152,11 +150,31 @@ def main():
     zoom_end = test_end  # Including all test data
     
     axs[2].plot(range(zoom_start, train_end), dropoff_data[zoom_start:train_end], label='Dropoff Training', color='blue', alpha=0.6)
-    axs[2].plot(range(test_st, test_end), dropoff_test, label='Dropoff Test', color='blue')
-    axs[2].plot(range(test_st, test_end), dropoff_forecast, label='Dropoff Forecast', color='blue', linestyle='-.')
+    axs[2].plot(range(test_st, test_end), dropoff_test, label='Dropoff Test', color='blue', alpha=0.8)
+    axs[2].plot(range(test_st, test_end), dropoff_forecast, label='Dropoff Forecast', color='blue', linestyle='-.', alpha=0.8)
     axs[2].plot(range(zoom_start, train_end), pickup_data[zoom_start:train_end], label='Pickup Training', color='green', alpha=0.6)
-    axs[2].plot(range(test_st, test_end), pickup_test, label='Pickup Test', color='green')
-    axs[2].plot(range(test_st, test_end), pickup_forecast, label='Pickup Forecast', color='green', linestyle='-.')
+    axs[2].plot(range(test_st, test_end), pickup_test, label='Pickup Test', color='green', alpha=0.8)
+    axs[2].plot(range(test_st, test_end), pickup_forecast, label='Pickup Forecast', color='green', linestyle='-.', alpha=0.8)
+    # Dropoff difference fill
+    axs[2].fill_between(
+        range(test_st, test_end),
+        dropoff_test,
+        dropoff_forecast,
+        color='blue',
+        alpha=0.2,
+        label='Dropoff Error'
+    )
+
+    # Pickup difference fill
+    axs[2].fill_between(
+        range(test_st, test_end),
+        pickup_test,
+        pickup_forecast,
+        color='green',
+        alpha=0.2,
+        label='Pickup Error'
+    )
+
     axs[2].axvline(x=train_end, color='red', linestyle='--', alpha=0.5)
     axs[2].annotate('End of Training', xy=(train_end, axs[2].get_ylim()[1]*0.9), xytext=(train_end+0.5, axs[2].get_ylim()[1]*0.9),
                    arrowprops=dict(facecolor='red', shrink=0.05, width=1, headwidth=6), fontsize=9, horizontalalignment='left')
