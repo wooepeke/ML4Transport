@@ -95,13 +95,13 @@ def main():
     axs[1].grid(True, alpha=0.3)
 
 
-    # New subplot: Zoomed-in view of the last 20 timesteps of training + test period
+    # Zoom view
     axs[2].set_title('Zoomed View: Last 20 Training Steps + Test Period')
     axs[2].set_xlabel('Time')
     
     # Define the zoom window
-    zoom_start = train_end - 20  # Last 20 timesteps of training
-    zoom_end = test_end  # Including all test data
+    zoom_start = train_end - 20 
+    zoom_end = test_end 
     
     axs[2].plot(range(zoom_start, train_end), dropoff_data[zoom_start:train_end], label='Dropoff Training', color='blue', alpha=0.6)
     axs[2].plot(range(test_st, test_end), dropoff_test, label='Dropoff Test', color='blue', alpha=0.8)
@@ -137,7 +137,6 @@ def main():
 
     plt.tight_layout()
     plt.subplots_adjust(top=0.95)
-    # plt.suptitle(f'ARIMA Forecasts (Dropoff & Pickup)', fontsize=14)
     plt.show()
 
 if __name__ == "__main__":

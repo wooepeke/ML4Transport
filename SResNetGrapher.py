@@ -125,7 +125,6 @@ def main():
         res_units = 2
     
     # Mock forecasts for visualization
-    # Normally you would use the trained model to generate these
     forecast_dropoff_test = dropoff_test * 0.9 + np.random.randn(len(dropoff_test)) * 0.5
     forecast_pickup_test = pickup_test * 0.9 + np.random.randn(len(pickup_test)) * 0.5
     
@@ -144,7 +143,6 @@ def main():
     pickup_metrics = {'MAE': pickup_mae, 'RMSE': pickup_rmse}
     
     # --- Plot the results ---
-    # Create a figure with 3 rows of subplots
     fig, axs = plt.subplots(3, 1, figsize=(15, 15), gridspec_kw={'height_ratios': [1, 1, 1]})
     
     # --- Plotting in SARIMA style ---
@@ -175,7 +173,6 @@ def main():
     axs[2].set_xlabel('Time')
     
     zoom_start = train_end - 20
-    zoom_end = test_end
 
     axs[2].plot(range(zoom_start, train_end), dropoff_region_data[zoom_start:train_end], label='Dropoff Training', color='blue', alpha=0.6)
     axs[2].plot(range(test_st, test_end), dropoff_test, label='Dropoff Test', color='blue', alpha=0.8)
@@ -195,7 +192,6 @@ def main():
 
     plt.tight_layout()
     plt.subplots_adjust(top=0.95)
-    # plt.suptitle('STResNet Forecasts (Dropoff & Pickup)', fontsize=14)
     plt.show()
 
 
