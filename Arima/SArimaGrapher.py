@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from Arima import Arima  # Import the fixed ARIMA class
+from SArima import SArima  # Import the fixed ARIMA class
 from tqdm import tqdm
 
 np.random.seed(42)
@@ -37,10 +37,10 @@ def main():
     pickup_data = np.load(r'data\pickup_counts.npy')[:, 1, 0]
 
     # Define the training and testing indices
-    forecast_hours = 4  # Maximum forecast period of 24 hours
+    forecast_hours = 24  # Maximum forecast period of 24 hours
     T = 24  # number of time intervals in one day
     train_st = 500
-    train_end = test_st = (train_st + 48)
+    train_end = test_st = (train_st + 240)
     test_end = test_st + forecast_hours
 
     # --- Dropoff Model ---
@@ -51,13 +51,13 @@ def main():
     # Grid search for optimal parameters
     do_grid_search = True
     
-    value_range = [0, 1, 2, 3]
+    value_range = [0, 1, 2, 3, 4, 5, 6, 7]
 
     if do_grid_search:
         p_values = value_range
         d_values = value_range
         q_values = value_range
-        best_params, best_score = grid_search(Arima, p_values, d_values, q_values, dropoff_train)
+        best_params, best_score = grid_search(SArima, p_values, d_values, q_values, dropoff_train)
         p, d, q, ar_params, ma_params = best_params
     else:
         # Default to ARIMA(1,1,1) with standard parameters
@@ -66,12 +66,12 @@ def main():
         ma_params = [0.5]
 
     # Set best parameters and run model
-    dropoff_model = Arima(p=p, d=d, q=q, ar_params=ar_params, ma_params=ma_params)
+    dropoff_model = SArima(p=p, d=d, q=q, ar_params=ar_params, ma_params=ma_params)
     dropoff_model.run_model(dropoff_train)
         
     # Make forecast for test period
     test_period_length = test_end - test_st
-    forecast_dropoff_test = dropoff_model.forecast_test_period(test_period_length)
+    forecast_dropoff_test = dropoff_model.forecast(test_period_length)
 
     # --- Pickup Model ---
     print("\nOptimizing Pickup model...")
@@ -82,7 +82,7 @@ def main():
         p_values = value_range
         d_values = value_range
         q_values = value_range
-        best_params, best_score = grid_search(Arima, p_values, d_values, q_values, pickup_train)
+        best_params, best_score = grid_search(SArima, p_values, d_values, q_values, pickup_train)
         p, d, q, ar_params, ma_params = best_params
     else:
         # Default to ARIMA(1,1,1) with standard parameters
@@ -91,11 +91,11 @@ def main():
         ma_params = [0.5]
 
     # Set best parameters and run model
-    pickup_model = Arima(p=p, d=d, q=q, ar_params=ar_params, ma_params=ma_params)
+    pickup_model = SArima(p=p, d=d, q=q, ar_params=ar_params, ma_params=ma_params)
     pickup_model.run_model(pickup_train)
     
     # Make forecast for test period
-    forecast_pickup_test = pickup_model.forecast_test_period(test_period_length)
+    forecast_pickup_test = pickup_model.forecast(test_period_length)
 
     # Calculate test metrics
     dropoff_metrics = dropoff_model.evaluate_test_data(dropoff_test)
@@ -103,7 +103,7 @@ def main():
 
     # --- Plot the results ---
     # Create a figure with 3 rows of subplots
-    fig, axs = plt.subplots(3, 1, figsize=(15, 15), gridspec_kw={'height_ratios': [1, 1, 1]})
+    fig, axs = plt.subplots(3, 1, figsize=(10, 10), gridspec_kw={'height_ratios': [1, 1, 1]})
     
     # Dropoff Forecast Plot
     # Training data
