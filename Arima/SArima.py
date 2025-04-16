@@ -130,15 +130,15 @@ class Sarima:
         self.forecast_values = forecast
         return forecast
 
-    def evaluate(self):
+    def evaluate(self, predictions, test_data):
         if self.fitted_values is None:
             raise ValueError("Model not fitted yet.")
 
-        actual = self.diff_ts.iloc[max(self.p, self.q, self.P * self.s, self.Q * self.s):]
-        pred = self.fitted_values
+        actual = test_data
+        pred = predictions
 
         mae = mean_absolute_error(actual, pred)
-        rmse = np.sqrt(mean_squared_error(actual, pred))
+        rmse = np.sqrt(np.mean((predictions-actual)**2))
 
         return {'MAE': mae, 'RMSE': rmse}
 

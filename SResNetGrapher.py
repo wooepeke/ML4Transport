@@ -76,12 +76,12 @@ def main():
     # Use same region as in ARIMA example for comparison
     region_i, region_j = 1, 0
     
-    # Define the training and testing indices
     forecast_hours = 24
-    T = 24  # number of time intervals in one day
-    train_st = 500
-    train_end = test_st = (train_st + 240)
+    training_length = 2400
+    train_st = 200
+    train_end = test_st = training_length + train_st
     test_end = test_st + forecast_hours
+    test_period_length = test_end - test_st
     
     # Extract data for the specific region
     dropoff_region_data = dropoff_data[:, region_i, region_j]
@@ -147,108 +147,57 @@ def main():
     # Create a figure with 3 rows of subplots
     fig, axs = plt.subplots(3, 1, figsize=(15, 15), gridspec_kw={'height_ratios': [1, 1, 1]})
     
-    # Dropoff Forecast Plot
-    # Training data
-    axs[0].plot(range(train_st, train_end), dropoff_train, 
-                label='Training Data', color='blue', alpha=0.6)
+    # --- Plotting in SARIMA style ---
+    fig, axs = plt.subplots(3, 1, figsize=(10, 10), gridspec_kw={'height_ratios': [1, 1, 1]})
     
-    # Model fit on training data
-    axs[0].plot(range(train_st, train_end), dropoff_fit, 
-                label='Model Fit', color='green', linestyle='--')
-    
-    # Test data
-    axs[0].plot(range(test_st, test_end), dropoff_test, 
-                label='Test Data', color='orange', alpha=0.6)
-    
-    # Forecasted test data
-    axs[0].plot(range(test_st, test_end), forecast_dropoff_test, 
-                label='Test Period Forecast', color='purple', linestyle='-.')
-    
-    axs[0].set_title(f'Dropoff Forecast - STResNet (ResUnits={res_units})')
-    axs[0].set_ylabel('Dropoff Count')
-    axs[0].legend()
+    zoom_len = 264
+
+    # --- Dropoff Plot ---
+    axs[0].plot(range(train_st, train_end)[-zoom_len:], dropoff_train[-zoom_len:], label='Training Data', color='blue')
+    axs[0].plot(range(train_st, train_end)[-zoom_len:], dropoff_fit[-zoom_len:], label='Model Fit', color='green', linestyle='--')
+    axs[0].plot(range(test_st, test_end)[-zoom_len:], dropoff_test[-zoom_len:], label='Test Data', color='orange')
+    axs[0].plot(range(test_st, test_end)[-zoom_len:], forecast_dropoff_test[-zoom_len:], label='Forecast', color='purple', linestyle='-.')
+    axs[0].set_title(f'Dropoff Forecast {zoom_len}/{training_length + test_period_length} timesteps - STResNet')
+    axs[0].legend(loc='upper left')
     axs[0].grid(True, alpha=0.3)
 
-    # Pickup Forecast Plot
-    # Training data
-    axs[1].plot(range(train_st, train_end), pickup_train, 
-                label='Training Data', color='blue', alpha=0.6)
-    
-    # Model fit on training data
-    axs[1].plot(range(train_st, train_end), pickup_fit, 
-                label='Model Fit', color='green', linestyle='--')
-    
-    # Test data
-    axs[1].plot(range(test_st, test_end), pickup_test, 
-                label='Test Data', color='orange', alpha=0.6)
-    
-    # Forecasted test data
-    axs[1].plot(range(test_st, test_end), forecast_pickup_test, 
-                label='Test Period Forecast', color='purple', linestyle='-.')
-    
-    axs[1].set_title(f'Pickup Forecast - STResNet (ResUnits={res_units})')
-    axs[1].set_ylabel('Pickup Count')
-    axs[1].legend()
+    # --- Pickup Plot ---
+    axs[1].plot(range(train_st, train_end)[-zoom_len:], pickup_train[-zoom_len:], label='Training Data', color='blue')
+    axs[1].plot(range(train_st, train_end)[-zoom_len:], pickup_fit[-zoom_len:], label='Model Fit', color='green', linestyle='--')
+    axs[1].plot(range(test_st, test_end)[-zoom_len:], pickup_test[-zoom_len:], label='Test Data', color='orange')
+    axs[1].plot(range(test_st, test_end)[-zoom_len:], forecast_pickup_test[-zoom_len:], label='Forecast', color='purple', linestyle='-.')
+    axs[1].set_title(f'Pickup Forecast {zoom_len}/{training_length + test_period_length} timesteps - STResNet')
+    axs[1].legend(loc='upper left')
     axs[1].grid(True, alpha=0.3)
 
-    # Add vertical line to mark where train data ends for main plots
-    for ax in axs[:2]:
-        ax.axvline(x=train_end, color='gray', linestyle='--', alpha=0.5)
-        ax.annotate('End of Training', xy=(train_end, ax.get_ylim()[1]*0.85),
-                   xytext=(train_end+2, ax.get_ylim()[1]*0.85),
-                   arrowprops=dict(facecolor='gray', shrink=0.05, width=1, headwidth=6),
-                   fontsize=9, horizontalalignment='left')
-
-    # Add text box with metrics for main plots
-    dropoff_text = f"Test Metrics:\nMAE: {dropoff_metrics['MAE']:.2f}\nRMSE: {dropoff_metrics['RMSE']:.2f}"
-    axs[0].text(0.02, 0.05, dropoff_text, transform=axs[0].transAxes, 
-               bbox=dict(facecolor='white', alpha=0.8, boxstyle='round'))
-               
-    pickup_text = f"Test Metrics:\nMAE: {pickup_metrics['MAE']:.2f}\nRMSE: {pickup_metrics['RMSE']:.2f}"
-    axs[1].text(0.02, 0.05, pickup_text, transform=axs[1].transAxes, 
-               bbox=dict(facecolor='white', alpha=0.8, boxstyle='round'))
-    
-    # New subplot: Zoomed-in view of the last 20 timesteps of training + test period
+    # --- Zoomed-in subplot ---
     axs[2].set_title('Zoomed View: Last 20 Training Steps + Test Period')
     axs[2].set_xlabel('Time')
     
-    # Define the zoom window
-    zoom_start = train_end - 20  # Last 20 timesteps of training
-    zoom_end = test_end  # Including all test data
-    
-    # Plot dropoff data (zoomed)
-    axs[2].plot(range(zoom_start, train_end), dropoff_region_data[zoom_start:train_end], 
-                label='Dropoff Training', color='blue', alpha=0.6)
-    axs[2].plot(range(test_st, test_end), dropoff_test, 
-                label='Dropoff Test', color='blue')
-    axs[2].plot(range(test_st, test_end), forecast_dropoff_test, 
-                label='Dropoff Forecast', color='blue', linestyle='-.')
-                
-    # Plot pickup data (zoomed)
-    axs[2].plot(range(zoom_start, train_end), pickup_region_data[zoom_start:train_end], 
-                label='Pickup Training', color='green', alpha=0.6)
-    axs[2].plot(range(test_st, test_end), pickup_test, 
-                label='Pickup Test', color='green')
-    axs[2].plot(range(test_st, test_end), forecast_pickup_test, 
-                label='Pickup Forecast', color='green', linestyle='-.')
-    
-    # Add vertical line for end of training in zoomed plot
+    zoom_start = train_end - 20
+    zoom_end = test_end
+
+    axs[2].plot(range(zoom_start, train_end), dropoff_region_data[zoom_start:train_end], label='Dropoff Training', color='blue', alpha=0.6)
+    axs[2].plot(range(test_st, test_end), dropoff_test, label='Dropoff Test', color='blue', alpha=0.8)
+    axs[2].plot(range(test_st, test_end), forecast_dropoff_test, label='Dropoff Forecast', color='blue', linestyle='-.', alpha=0.8)
+    axs[2].plot(range(zoom_start, train_end), pickup_region_data[zoom_start:train_end], label='Pickup Training', color='green', alpha=0.6)
+    axs[2].plot(range(test_st, test_end), pickup_test, label='Pickup Test', color='green', alpha=0.8)
+    axs[2].plot(range(test_st, test_end), forecast_pickup_test, label='Pickup Forecast', color='green', linestyle='-.', alpha=0.8)
+
+    axs[2].fill_between(range(test_st, test_end), dropoff_test, forecast_dropoff_test, color='blue', alpha=0.2, label='Dropoff Error')
+    axs[2].fill_between(range(test_st, test_end), pickup_test, forecast_pickup_test, color='green', alpha=0.2, label='Pickup Error')
+
     axs[2].axvline(x=train_end, color='red', linestyle='--', alpha=0.5)
-    axs[2].annotate('End of Training', xy=(train_end, axs[2].get_ylim()[1]*0.9),
-                   xytext=(train_end+0.5, axs[2].get_ylim()[1]*0.9),
-                   arrowprops=dict(facecolor='red', shrink=0.05, width=1, headwidth=6),
-                   fontsize=9, horizontalalignment='left')
-    
+    axs[2].annotate('End of Training', xy=(train_end, axs[2].get_ylim()[1]*0.9), xytext=(train_end+0.5, axs[2].get_ylim()[1]*0.9),
+                   arrowprops=dict(facecolor='red', shrink=0.05, width=1, headwidth=6), fontsize=9, horizontalalignment='left')
     axs[2].grid(True, alpha=0.3)
     axs[2].legend(loc='upper left')
-        
-    # Adjust layout
-    model_str = f"STResNet (ResUnits={res_units}, C={len_closeness}, P={len_period}, T={len_trend})"
-    plt.suptitle(f"{model_str} Model with Test Period Forecast")
+
     plt.tight_layout()
-    plt.subplots_adjust(top=0.95, hspace=0.3)  # Adjust space for title and between subplots
-    
+    plt.subplots_adjust(top=0.95)
+    # plt.suptitle('STResNet Forecasts (Dropoff & Pickup)', fontsize=14)
     plt.show()
+
 
 
 class STResNetGrapher:
@@ -380,133 +329,8 @@ class STResNetGrapher:
             'pickup': {'MAE': pickup_mae, 'RMSE': pickup_rmse}
         }
     
-    def plot_results(self, train_st=500, train_end=548, test_end=552):
-        # Prepare data
-        (dropoff_train, dropoff_test), (pickup_train, pickup_test), (ext_train, ext_test), (train_st, train_end, test_st, test_end) = self.prepare_data(train_st, train_end, test_end)
-        
-        # Generate forecasts
-        forecast_dropoff_test, forecast_pickup_test, metrics = self.generate_forecasts(dropoff_test, pickup_test)
-        
-        # Mock training fit
-        dropoff_fit = dropoff_train * 0.95 + np.random.randn(len(dropoff_train)) * 0.3
-        pickup_fit = pickup_train * 0.95 + np.random.randn(len(pickup_train)) * 0.3
-        
-        # Plot the results
-        # Create a figure with 3 rows of subplots
-        fig, axs = plt.subplots(3, 1, figsize=(15, 15), gridspec_kw={'height_ratios': [1, 1, 1]})
-        
-        # Dropoff Forecast Plot
-        # Training data
-        axs[0].plot(range(train_st, train_end), dropoff_train, 
-                    label='Training Data', color='blue', alpha=0.6)
-        
-        # Model fit on training data
-        axs[0].plot(range(train_st, train_end), dropoff_fit, 
-                    label='Model Fit', color='green', linestyle='--')
-        
-        # Test data
-        axs[0].plot(range(test_st, test_end), dropoff_test, 
-                    label='Test Data', color='orange', alpha=0.6)
-        
-        # Forecasted test data
-        axs[0].plot(range(test_st, test_end), forecast_dropoff_test, 
-                    label='Test Period Forecast', color='purple', linestyle='-.')
-        
-        axs[0].set_title(f'Dropoff Forecast - STResNet (ResUnits={self.nb_residual_unit})')
-        axs[0].set_ylabel('Dropoff Count')
-        axs[0].legend()
-        axs[0].grid(True, alpha=0.3)
-        axs[0].legend(loc='upper left')
-
-        # Pickup Forecast Plot
-        # Training data
-        axs[1].plot(range(train_st, train_end), pickup_train, 
-                    label='Training Data', color='blue', alpha=0.6)
-        
-        # Model fit on training data
-        axs[1].plot(range(train_st, train_end), pickup_fit, 
-                    label='Model Fit', color='green', linestyle='--')
-        
-        # Test data
-        axs[1].plot(range(test_st, test_end), pickup_test, 
-                    label='Test Data', color='orange', alpha=0.6)
-        
-        # Forecasted test data
-        axs[1].plot(range(test_st, test_end), forecast_pickup_test, 
-                    label='Test Period Forecast', color='purple', linestyle='-.')
-        
-        axs[1].set_title(f'Pickup Forecast - STResNet (ResUnits={self.nb_residual_unit})')
-        axs[1].set_ylabel('Pickup Count')
-        axs[1].legend()
-        axs[1].grid(True, alpha=0.3)
-
-        # Add vertical line to mark where train data ends for main plots
-        for ax in axs[:2]:
-            ax.axvline(x=train_end, color='gray', linestyle='--', alpha=0.5)
-            ax.annotate('End of Training', xy=(train_end, ax.get_ylim()[1]*0.85),
-                       xytext=(train_end+2, ax.get_ylim()[1]*0.85),
-                       arrowprops=dict(facecolor='gray', shrink=0.05, width=1, headwidth=6),
-                       fontsize=9, horizontalalignment='left')
-
-        # Add text box with metrics for main plots
-        dropoff_text = f"Test Metrics:\nMAE: {metrics['dropoff']['MAE']:.2f}\nRMSE: {metrics['dropoff']['RMSE']:.2f}"
-        axs[0].text(0.02, 0.05, dropoff_text, transform=axs[0].transAxes, 
-                   bbox=dict(facecolor='white', alpha=0.8, boxstyle='round'))
-                   
-        pickup_text = f"Test Metrics:\nMAE: {metrics['pickup']['MAE']:.2f}\nRMSE: {metrics['pickup']['RMSE']:.2f}"
-        axs[1].text(0.02, 0.05, pickup_text, transform=axs[1].transAxes, 
-                   bbox=dict(facecolor='white', alpha=0.8, boxstyle='round'))
-        axs[1].legend(loc='upper left')
-
-        # New subplot: Zoomed-in view of the last 20 timesteps of training + test period
-        axs[2].set_title('Zoomed View: Last 20 Training Steps + Test Period')
-        axs[2].set_xlabel('Time')
-        
-        # Define the zoom window
-        zoom_start = train_end - 20  # Last 20 timesteps of training
-        zoom_end = test_end  # Including all test data
-        
-        # Plot dropoff data (zoomed)
-        axs[2].plot(range(zoom_start, train_end), self.dropoff_region_data[zoom_start:train_end], 
-                    label='Dropoff Training', color='blue', alpha=0.6)
-        axs[2].plot(range(test_st, test_end), dropoff_test, 
-                    label='Dropoff Test', color='blue')
-        axs[2].plot(range(test_st, test_end), forecast_dropoff_test, 
-                    label='Dropoff Forecast', color='blue', linestyle='-.')
-                    
-        # Plot pickup data (zoomed)
-        axs[2].plot(range(zoom_start, train_end), self.pickup_region_data[zoom_start:train_end], 
-                    label='Pickup Training', color='green', alpha=0.6)
-        axs[2].plot(range(test_st, test_end), pickup_test, 
-                    label='Pickup Test', color='green')
-        axs[2].plot(range(test_st, test_end), forecast_pickup_test, 
-                    label='Pickup Forecast', color='green', linestyle='-.')
-        
-        # Add vertical line for end of training in zoomed plot
-        axs[2].axvline(x=train_end, color='red', linestyle='--', alpha=0.5)
-        axs[2].annotate('End of Training', xy=(train_end, axs[2].get_ylim()[1]*0.9),
-                       xytext=(train_end+0.5, axs[2].get_ylim()[1]*0.9),
-                       arrowprops=dict(facecolor='red', shrink=0.05, width=1, headwidth=6),
-                       fontsize=9, horizontalalignment='left')
-        
-        axs[2].grid(True, alpha=0.3)
-        axs[2].legend(loc='upper left')
-            
-        # Adjust layout
-        model_str = f"STResNet (ResUnits={self.nb_residual_unit}, C={self.len_closeness}, P={self.len_period}, T={self.len_trend})"
-        # plt.suptitle(f"{model_str} Model with Test Period Forecast")
-        plt.tight_layout()
-        plt.subplots_adjust(top=0.95, hspace=0.3)  # Adjust space for title and between subplots
-        
-        plt.show()
-        
-        return metrics
-
 
 if __name__ == "__main__":
     # Run the standalone visualization function
     main()
     
-    # Alternatively, use the class-based approach
-    # grapher = STResNetGrapher()
-    # grapher.plot_results()

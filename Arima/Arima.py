@@ -32,7 +32,7 @@ class Arima:
     def fit(self, series):
         self.ts = pd.Series(series)
         self.diff_ts = self.difference(self.ts, self.d)
-        print(len(self.diff_ts))
+
         n = len(self.diff_ts)
         fitted = []
         self.residuals = []
@@ -97,12 +97,12 @@ class Arima:
         self.forecast_values = forecast
         return forecast
 
-    def evaluate(self):
+    def evaluate(self, predictions, test_data):
         if self.fitted_values is None:
             raise ValueError("Model not fitted yet.")
 
-        actual = self.diff_ts.iloc[max(self.p, self.q):]
-        pred = self.fitted_values
+        actual = test_data
+        pred = predictions
 
         mae = mean_absolute_error(actual, pred)
         rmse = np.sqrt(mean_squared_error(actual, pred))
