@@ -7,34 +7,27 @@ from matplotlib.colors import PowerNorm
 
 np.random.seed(42)
 
-def forecast_grid(model_class, train_data, forecast_period, alpha_range, theta_range):
-    """
-    Forecast demand for all grid cells using the given ARIMA model.
-    Capping negative forecasted values at 0.
-    """
+from arima2 import ARIMAGridSearch  # Assuming you saved the previous class in this file
+
+def forecast_grid(model_class, train_data, forecast_period, p_range, d_range, q_range):
     forecast_grid = np.zeros((32, 32, forecast_period))  # Initialize the grid for predictions
-    model = model_class()
 
     for i in tqdm(range(32)):
         for j in range(32):
-            # Extract data for the current grid cell
             cell_data = train_data[:, i, j]
-            
-            # Initialize and fit ARIMA model
-            
-            # Grid search for optimal parameters
-            #best_params, _ = model.grid_search(alpha_range, theta_range, metric='MAE')
-            #model.alpha, model.theta = best_params
-            model.alpha, model.theta = 0.1, 0.05
-            model.run_model(train_data)
+            model = model_class(cell_data)
 
-            # Forecast for the given period
-            forecast_values = model.forecast_test_period(forecast_period)
+            # Grid search for best (p,d,q)
+            try:
+                best_order, _, _ = model.grid_search(p_range, d_range, q_range, metric='MAE')
+                forecast_values = model.forecast(steps=forecast_period)
+            except Exception as e:
+                forecast_values = np.zeros(forecast_period)  # fallback if model fails
 
-            # Cap any negative forecast values at 0
-            forecast_grid[i, j, :] = np.maximum(forecast_values, 0)
+            forecast_grid[i, j, :] = np.maximum(forecast_values, 0)  # cap at 0
 
     return forecast_grid
+
 
 
 def plot_heatmap(ax, data, title, vmin, vmax, cmap='plasma'):
@@ -56,21 +49,17 @@ def main():
     train_end = test_st = (train_st + 240)
     test_end = test_st + forecast_hours
 
-    # --- Dropoff Forecast ---
+    p_range = range(3)  # Adjust depending on complexity and performance
+    d_range = range(2)
+    q_range = range(3)
     print("Optimizing Dropoff model...")
     dropoff_train = dropoff_data[train_st:train_end]
+    forecast_dropoff_grid = forecast_grid(ARIMAGridSearch, dropoff_train, forecast_hours, p_range, d_range, q_range)
 
-    # Grid search for optimal parameters
-    alpha_range = np.linspace(0.1, 0.9, 50)
-    theta_range = np.linspace(0.1, 0.9, 50)
-
-    forecast_dropoff_grid = forecast_grid(Arima, dropoff_train, forecast_hours, alpha_range, theta_range)
-
-    # --- Pickup Forecast ---
     print("\nOptimizing Pickup model...")
     pickup_train = pickup_data[train_st:train_end]
+    forecast_pickup_grid = forecast_grid(ARIMAGridSearch, pickup_train, forecast_hours, p_range, d_range, q_range)
 
-    forecast_pickup_grid = forecast_grid(Arima, pickup_train, forecast_hours, alpha_range, theta_range)
 
     # Find the maximum value across both dropoff and pickup forecast grids to set a common scale
     max_value = max(np.max(forecast_dropoff_grid), np.max(forecast_pickup_grid))
