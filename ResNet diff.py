@@ -129,27 +129,27 @@ def main():
     # Loop through timesteps
     for t in range(num_timesteps):
         # Dropoff - Predicted
-        plot_heatmap(axs[0, t], predictions_denorm[t, 0],
+        plot_heatmap(axs[0, t], predictions_denorm[t, 1],
                      f"Dropoff Forecast - Timestep {t + 1}", vmin=0, vmax=max_value)
 
         # Dropoff - Actual
-        plot_heatmap(axs[1, t], Y_test_denorm[t, 0],
+        plot_heatmap(axs[1, t], Y_test_denorm[t, 1],
                      f"Dropoff Actual - Timestep {t + 1}", vmin=0, vmax=max_value)
 
         # Dropoff - Difference
-        plot_difference_heatmap(axs[2, t], predictions_denorm[t, 0], Y_test_denorm[t, 0],
+        plot_difference_heatmap(axs[2, t], predictions_denorm[t, 1], Y_test_denorm[t, 1],
                                 f"Dropoff Difference - Timestep {t + 1}")
 
         # Pickup - Predicted
-        plot_heatmap(axs[3, t], predictions_denorm[t, 1],
+        plot_heatmap(axs[3, t], predictions_denorm[t, 0],
                      f"Pickup Forecast - Timestep {t + 1}", vmin=0, vmax=max_value)
 
         # Pickup - Actual
-        plot_heatmap(axs[4, t], Y_test_denorm[t, 1],
+        plot_heatmap(axs[4, t], Y_test_denorm[t, 0],
                      f"Pickup Actual - Timestep {t + 1}", vmin=0, vmax=max_value)
 
         # Pickup - Difference
-        plot_difference_heatmap(axs[5, t], predictions_denorm[t, 1], Y_test_denorm[t, 1],
+        plot_difference_heatmap(axs[5, t], predictions_denorm[t, 0], Y_test_denorm[t, 0],
                                 f"Pickup Difference - Timestep {t + 1}")
 
     # Add row labels

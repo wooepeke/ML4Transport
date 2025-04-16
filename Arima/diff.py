@@ -25,7 +25,7 @@ def forecast_grid(model_class, train_data, forecast_period, alpha_range, theta_r
             # Grid search for optimal parameters
             # best_params, _ = model.grid_search(alpha_range, theta_range, metric='MAE')
             # model.alpha, model.theta = best_params
-            model.alpha, model.theta = 0.1, 0.05
+            model.alpha, model.theta = 0.5, 0.5
             model.run_model(cell_data)
 
             # Forecast for the given period
@@ -54,7 +54,7 @@ def forecast_grid(model_class, train_data, forecast_period, alpha_range, theta_r
 
 
 def plot_heatmap(ax, data, title, vmin, vmax, cmap='plasma'):
-    norm = PowerNorm(gamma=0.4, vmin=vmin, vmax=vmax)  # gamma < 1 boosts lower values
+    norm = PowerNorm(gamma=0.4, vmin=vmin, vmax=1000)  # gamma < 1 boosts lower values
     cax = ax.imshow(data, cmap=cmap, norm=norm)
     ax.set_title(title)
     plt.colorbar(cax, ax=ax, shrink=0.8)
@@ -86,7 +86,7 @@ def main():
     # Define the training and testing indices
     forecast_hours = 2  # Maximum forecast period of 4 hours
     T = 24  # number of time intervals in one day
-    train_st = 3601 - 240
+    train_st = 2600 - 240
     train_end = test_st = (train_st + 240)
     test_end = test_st + forecast_hours
 

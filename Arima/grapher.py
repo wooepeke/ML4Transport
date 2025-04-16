@@ -1,9 +1,35 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from Arima import Arima
+from Arima import Arima  # Import the fixed ARIMA class
+from tqdm import tqdm
 
 np.random.seed(42)
+
+def grid_search(model_class, p_values, d_values, q_values, data, metric='MAE'):
+    """
+    Grid search for optimal ARIMA parameters (p, d, q)
+    """
+    best_score = float('inf')
+    best_params = (None, None, None, None, None)  # p, d, q, ar_params, ma_params
+
+    for p in tqdm(p_values, desc="Progress"):
+        for d in d_values:
+            for q in q_values:
+                # For simplicity, we'll use default ar_params and ma_params
+                model = model_class(p=p, d=d, q=q)
+                model.run_model(data)
+
+                total_mae, total_rmse = model.compute_full_metrics()
+
+                if total_mae < best_score:
+                    best_score = total_mae
+                    best_params = (p, d, q, model.ar_params, model.ma_params)
+
+    print(f"Best params: p={best_params[0]}, d={best_params[1]}, q={best_params[2]}, ar={model.ar_params}, ma={model.ma_params}")
+    print(f"Best score: {best_score}")
+    return best_params, best_score
+
 
 def main():
     # Load the data
@@ -11,35 +37,37 @@ def main():
     pickup_data = np.load(r'data\pickup_counts.npy')[:, 1, 0]
 
     # Define the training and testing indices
-    forecast_hours = 4  # Maximum forecast period of 4 hours
+    forecast_hours = 4  # Maximum forecast period of 24 hours
     T = 24  # number of time intervals in one day
-    train_st = 0
-    train_end = test_st = (train_st + 240)
+    train_st = 500
+    train_end = test_st = (train_st + 48)
     test_end = test_st + forecast_hours
 
     # --- Dropoff Model ---
     print("Optimizing Dropoff model...")
     dropoff_train = dropoff_data[train_st:train_end]
-    dropoff_test = dropoff_data[test_st:test_end]
-    
-    dropoff_model = Arima(dropoff_train)
+    dropoff_test = dropoff_data[train_end:test_end]
     
     # Grid search for optimal parameters
-    alpha_range = np.linspace(0.1, 0.9, 10)
-    theta_range = np.linspace(0.1, 0.9, 10)
+    do_grid_search = True
     
-    best_params, best_score = dropoff_model.grid_search(alpha_range, theta_range, metric='MAE')
-    print(f"Best Dropoff Params: alpha={best_params[0]:.2f}, theta={best_params[1]:.2f} with MAE={best_score:.4f}")
+    value_range = [0, 1, 2, 3]
+
+    if do_grid_search:
+        p_values = value_range
+        d_values = value_range
+        q_values = value_range
+        best_params, best_score = grid_search(Arima, p_values, d_values, q_values, dropoff_train)
+        p, d, q, ar_params, ma_params = best_params
+    else:
+        # Default to ARIMA(1,1,1) with standard parameters
+        p, d, q = 1, 1, 1
+        ar_params = [0.7]
+        ma_params = [0.5]
 
     # Set best parameters and run model
-    dropoff_model.alpha, dropoff_model.theta = best_params
-    dropoff_model.run_model()
-    
-    # Compute metrics on training data
-    dropoff_metrics = dropoff_model.compute_metrics()
-    print("Dropoff model metrics on training data:")
-    for k, v in dropoff_metrics.items():
-        print(f"  {k}: {v:.4f}")
+    dropoff_model = Arima(p=p, d=d, q=q, ar_params=ar_params, ma_params=ma_params)
+    dropoff_model.run_model(dropoff_train)
         
     # Make forecast for test period
     test_period_length = test_end - test_st
@@ -48,25 +76,30 @@ def main():
     # --- Pickup Model ---
     print("\nOptimizing Pickup model...")
     pickup_train = pickup_data[train_st:train_end]
-    pickup_test = pickup_data[test_st:test_end]
+    pickup_test = pickup_data[train_end:test_end]
     
-    pickup_model = Arima(pickup_train)
-    
-    best_params, best_score = pickup_model.grid_search(alpha_range, theta_range, metric='MAE')
-    print(f"Best Pickup Params: alpha={best_params[0]:.2f}, theta={best_params[1]:.2f} with MAE={best_score:.4f}")
+    if do_grid_search:
+        p_values = value_range
+        d_values = value_range
+        q_values = value_range
+        best_params, best_score = grid_search(Arima, p_values, d_values, q_values, pickup_train)
+        p, d, q, ar_params, ma_params = best_params
+    else:
+        # Default to ARIMA(1,1,1) with standard parameters
+        p, d, q = 1, 1, 1
+        ar_params = [0.7]
+        ma_params = [0.5]
 
     # Set best parameters and run model
-    pickup_model.alpha, pickup_model.theta = best_params
-    pickup_model.run_model()
+    pickup_model = Arima(p=p, d=d, q=q, ar_params=ar_params, ma_params=ma_params)
+    pickup_model.run_model(pickup_train)
     
-    # Compute metrics on training data
-    pickup_metrics = pickup_model.compute_metrics()
-    print("Pickup model metrics on training data:")
-    for k, v in pickup_metrics.items():
-        print(f"  {k}: {v:.4f}")
-        
     # Make forecast for test period
     forecast_pickup_test = pickup_model.forecast_test_period(test_period_length)
+
+    # Calculate test metrics
+    dropoff_metrics = dropoff_model.evaluate_test_data(dropoff_test)
+    pickup_metrics = pickup_model.evaluate_test_data(pickup_test)
 
     # --- Plot the results ---
     # Create a figure with 3 rows of subplots
@@ -90,7 +123,7 @@ def main():
     axs[0].plot(range(test_st, test_end), forecast_dropoff_test, 
                 label='Test Period Forecast', color='purple', linestyle='-.')
     
-    axs[0].set_title('Dropoff Forecast')
+    axs[0].set_title(f'Dropoff Forecast - ARIMA({p},{d},{q})')
     axs[0].set_ylabel('Dropoff Count')
     axs[0].legend()
     axs[0].grid(True, alpha=0.3)
@@ -113,7 +146,7 @@ def main():
     axs[1].plot(range(test_st, test_end), forecast_pickup_test, 
                 label='Test Period Forecast', color='purple', linestyle='-.')
     
-    axs[1].set_title('Pickup Forecast')
+    axs[1].set_title(f'Pickup Forecast - ARIMA({p},{d},{q})')
     axs[1].set_ylabel('Pickup Count')
     axs[1].legend()
     axs[1].grid(True, alpha=0.3)
@@ -127,11 +160,11 @@ def main():
                    fontsize=9, horizontalalignment='left')
 
     # Add text box with metrics for main plots
-    dropoff_text = f"Test Metrics:\nMAE: {dropoff_model.evaluate_test_data(dropoff_test)['MAE']:.2f}\nRMSE: {dropoff_model.evaluate_test_data(dropoff_test)['RMSE']:.2f}"
+    dropoff_text = f"Test Metrics:\nMAE: {dropoff_metrics['MAE']:.2f}\nRMSE: {dropoff_metrics['RMSE']:.2f}"
     axs[0].text(0.02, 0.05, dropoff_text, transform=axs[0].transAxes, 
                bbox=dict(facecolor='white', alpha=0.8, boxstyle='round'))
                
-    pickup_text = f"Test Metrics:\nMAE: {pickup_model.evaluate_test_data(pickup_test)['MAE']:.2f}\nRMSE: {pickup_model.evaluate_test_data(pickup_test)['RMSE']:.2f}"
+    pickup_text = f"Test Metrics:\nMAE: {pickup_metrics['MAE']:.2f}\nRMSE: {pickup_metrics['RMSE']:.2f}"
     axs[1].text(0.02, 0.05, pickup_text, transform=axs[1].transAxes, 
                bbox=dict(facecolor='white', alpha=0.8, boxstyle='round'))
     
@@ -168,20 +201,10 @@ def main():
     
     axs[2].grid(True, alpha=0.3)
     axs[2].legend(loc='upper left')
-    
-    # Calculate and display test data metrics
-    print("\nEvaluating dropoff model on test data:")
-    dropoff_test_metrics = dropoff_model.evaluate_test_data(dropoff_test)
-    for k, v in dropoff_test_metrics.items():
-        print(f"  {k}: {v:.4f}")
         
-    print("\nEvaluating pickup model on test data:")
-    pickup_test_metrics = pickup_model.evaluate_test_data(pickup_test)
-    for k, v in pickup_test_metrics.items():
-        print(f"  {k}: {v:.4f}")
-    
     # Adjust layout
-    plt.suptitle("ARIMA(1,1,1) Model with Test Period Forecast")
+    model_str = f"ARIMA({p},{d},{q})"
+    plt.suptitle(f"{model_str} Model with Test Period Forecast")
     plt.tight_layout()
     plt.subplots_adjust(top=0.95, hspace=0.3)  # Adjust space for title and between subplots
     
