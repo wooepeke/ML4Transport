@@ -1,173 +1,146 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from SArima import SArima  # Import the fixed ARIMA class
+from SArima import Sarima
+from sklearn.metrics import mean_absolute_error, mean_squared_error
 from tqdm import tqdm
 
 np.random.seed(42)
 
-def grid_search(model_class, p_values, d_values, q_values, data, metric='MAE'):
-    """
-    Grid search for optimal ARIMA parameters (p, d, q)
-    """
+def grid_search(model_class, 
+                p_values, d_values, q_values, 
+                P_values, D_values, Q_values, 
+                seasonal_period, 
+                data, 
+                metric='MAE'):
     best_score = float('inf')
-    best_params = (None, None, None, None, None)  # p, d, q, ar_params, ma_params
+    best_params = None
+    best_model = None
 
-    for p in tqdm(p_values, desc="Progress"):
+    print("Starting Grid Search...")
+    for p in tqdm(p_values, desc="p"):
         for d in d_values:
             for q in q_values:
-                # For simplicity, we'll use default ar_params and ma_params
-                model = model_class(p=p, d=d, q=q)
-                model.run_model(data)
+                for P in P_values:
+                    for D in D_values:
+                        for Q in Q_values:
+                            try:
+                                model = model_class(p=p, d=d, q=q, 
+                                                    P=P, D=D, Q=Q, s=seasonal_period)
+                                model.fit(data)
+                                score = model.evaluate()[metric]
 
-                total_mae, total_rmse = model.compute_full_metrics()
+                                if score < best_score:
+                                    best_score = score
+                                    best_params = (p, d, q, P, D, Q, seasonal_period)
+                                    best_model = model
+                            except Exception as e:
+                                continue
 
-                if total_mae < best_score:
-                    best_score = total_mae
-                    best_params = (p, d, q, model.ar_params, model.ma_params)
+    print(f"\nBest SARIMA(p,d,q)(P,D,Q,s): {best_params}")
+    print(f"Best {metric}: {best_score:.4f}")
+    return best_model, best_params, best_score
 
-    print(f"Best params: p={best_params[0]}, d={best_params[1]}, q={best_params[2]}, ar={model.ar_params}, ma={model.ma_params}")
-    print(f"Best score: {best_score}")
-    return best_params, best_score
 
 
 def main():
-    # Load the data
+    # --- Load Data ---
     dropoff_data = np.load(r'data\dropoff_counts.npy')[:, 1, 0]
     pickup_data = np.load(r'data\pickup_counts.npy')[:, 1, 0]
 
-    # Define the training and testing indices
-    forecast_hours = 24  # Maximum forecast period of 24 hours
-    T = 24  # number of time intervals in one day
+    forecast_hours = 24
     train_st = 500
-    train_end = test_st = (train_st + 240)
+    train_end = test_st = train_st + 240
     test_end = test_st + forecast_hours
+    test_period_length = test_end - test_st
 
-    # --- Dropoff Model ---
+    p_values = [0, 1, 2]
+    d_values = [0, 1]
+    q_values = [0, 1, 2]
+    P_values = [0, 1]
+    D_values = [0, 1]
+    Q_values = [0, 1]
+    seasonal_period = 24
+
+    # --- DROP-OFF MODEL ---
     print("Optimizing Dropoff model...")
     dropoff_train = dropoff_data[train_st:train_end]
     dropoff_test = dropoff_data[train_end:test_end]
-    
-    # Grid search for optimal parameters
-    do_grid_search = True
-    
-    value_range = [0, 1, 2, 3, 4, 5, 6, 7]
 
-    if do_grid_search:
-        p_values = value_range
-        d_values = value_range
-        q_values = value_range
-        best_params, best_score = grid_search(SArima, p_values, d_values, q_values, dropoff_train)
-        p, d, q, ar_params, ma_params = best_params
-    else:
-        # Default to ARIMA(1,1,1) with standard parameters
-        p, d, q = 1, 1, 1
-        ar_params = [0.7]
-        ma_params = [0.5]
+    # Now lest do some grid search
+    dropoff_model, dropoff_best_params, dropoff_best_score = grid_search(
+        model_class=Sarima,
+        p_values=p_values,
+        d_values=d_values,
+        q_values=q_values,
+        P_values=P_values,
+        D_values=D_values,
+        Q_values=Q_values,
+        seasonal_period=seasonal_period,
+        data=dropoff_train,
+        metric='MAE'
+    )
 
-    # Set best parameters and run model
-    dropoff_model = SArima(p=p, d=d, q=q, ar_params=ar_params, ma_params=ma_params)
-    dropoff_model.run_model(dropoff_train)
-        
-    # Make forecast for test period
-    test_period_length = test_end - test_st
-    forecast_dropoff_test = dropoff_model.forecast(test_period_length)
+    print(dropoff_best_params)
 
-    # --- Pickup Model ---
+    # dropoff_model = Sarima(p=1, d=0, q=2, P=1, D=0, Q=0)  # Try d=0 first
+    dropoff_model.ts = pd.Series(dropoff_train)
+    dropoff_model.check_stationarity()  # Check stationarity
+    dropoff_fitted = dropoff_model.fit(dropoff_train)
+    dropoff_forecast = dropoff_model.forecast(test_period_length)
+
+    # --- PICK-UP MODEL ---
     print("\nOptimizing Pickup model...")
     pickup_train = pickup_data[train_st:train_end]
     pickup_test = pickup_data[train_end:test_end]
-    
-    if do_grid_search:
-        p_values = value_range
-        d_values = value_range
-        q_values = value_range
-        best_params, best_score = grid_search(SArima, p_values, d_values, q_values, pickup_train)
-        p, d, q, ar_params, ma_params = best_params
-    else:
-        # Default to ARIMA(1,1,1) with standard parameters
-        p, d, q = 1, 1, 1
-        ar_params = [0.7]
-        ma_params = [0.5]
 
-    # Set best parameters and run model
-    pickup_model = SArima(p=p, d=d, q=q, ar_params=ar_params, ma_params=ma_params)
-    pickup_model.run_model(pickup_train)
-    
-    # Make forecast for test period
-    forecast_pickup_test = pickup_model.forecast(test_period_length)
+    # Now lest do some grid search
+    pickup_model, pickup_best_params, pickup_best_score = grid_search(
+        model_class=Sarima,
+        p_values=p_values,
+        d_values=d_values,
+        q_values=q_values,
+        P_values=P_values,
+        D_values=D_values,
+        Q_values=Q_values,
+        seasonal_period=seasonal_period,
+        data=pickup_train,
+        metric='MAE'
+    )
 
-    # Calculate test metrics
-    dropoff_metrics = dropoff_model.evaluate_test_data(dropoff_test)
-    pickup_metrics = pickup_model.evaluate_test_data(pickup_test)
+    # pickup_model = Sarima(p=1, d=0, q=0)  # Try d=0 first
+    pickup_model.ts = pd.Series(pickup_train)
+    pickup_model.check_stationarity()  # Check stationarity
+    pickup_fitted = pickup_model.fit(pickup_train)
+    pickup_forecast = pickup_model.forecast(test_period_length)
 
-    # --- Plot the results ---
-    # Create a figure with 3 rows of subplots
-    fig, axs = plt.subplots(3, 1, figsize=(10, 10), gridspec_kw={'height_ratios': [1, 1, 1]})
-    
-    # Dropoff Forecast Plot
-    # Training data
-    axs[0].plot(range(train_st, train_end), dropoff_train, 
-                label='Training Data', color='blue', alpha=0.6)
-    
-    # Model fit on training data
-    forecast_indices = dropoff_model.forecasted_full.index + train_st
-    axs[0].plot(forecast_indices, dropoff_model.forecasted_full, 
-                label='Model Fit', color='green', linestyle='--')
-    
-    # Test data
-    axs[0].plot(range(test_st, test_end), dropoff_test, 
-                label='Test Data', color='orange', alpha=0.6)
-    
-    # Forecasted test data
-    axs[0].plot(range(test_st, test_end), forecast_dropoff_test, 
-                label='Test Period Forecast', color='purple', linestyle='-.')
-    
-    axs[0].set_title(f'Dropoff Forecast - ARIMA({p},{d},{q})')
-    axs[0].set_ylabel('Dropoff Count')
+    # --- Evaluation on Test Data ---
+    dropoff_mae = mean_absolute_error(dropoff_test, dropoff_forecast)
+    dropoff_rmse = np.sqrt(mean_squared_error(dropoff_test, dropoff_forecast))
+    pickup_mae = mean_absolute_error(pickup_test, pickup_forecast)
+    pickup_rmse = np.sqrt(mean_squared_error(pickup_test, pickup_forecast))
+
+    # --- Plotting ---
+    fig, axs = plt.subplots(3, 1, figsize=(12, 10), gridspec_kw={'height_ratios': [1, 1, 1]})
+
+    # Dropoff plot
+    axs[0].plot(range(train_st, train_end), dropoff_train, label='Training Data', color='blue')
+    axs[0].plot(dropoff_model.fitted_values.index + train_st, dropoff_model.fitted_values, label='Model Fit', color='green', linestyle='--')
+    axs[0].plot(range(test_st, test_end), dropoff_test, label='Test Data', color='orange')
+    axs[0].plot(range(test_st, test_end), dropoff_forecast, label='Forecast', color='purple', linestyle='-.')
+    axs[0].set_title(f'Dropoff Forecast - Sarima(1,0,1)')
     axs[0].legend()
     axs[0].grid(True, alpha=0.3)
 
-    # Pickup Forecast Plot
-    # Training data
-    axs[1].plot(range(train_st, train_end), pickup_train, 
-                label='Training Data', color='blue', alpha=0.6)
-    
-    # Model fit on training data
-    forecast_indices = pickup_model.forecasted_full.index + train_st
-    axs[1].plot(forecast_indices, pickup_model.forecasted_full, 
-                label='Model Fit', color='green', linestyle='--')
-    
-    # Test data
-    axs[1].plot(range(test_st, test_end), pickup_test, 
-                label='Test Data', color='orange', alpha=0.6)
-    
-    # Forecasted test data
-    axs[1].plot(range(test_st, test_end), forecast_pickup_test, 
-                label='Test Period Forecast', color='purple', linestyle='-.')
-    
-    axs[1].set_title(f'Pickup Forecast - ARIMA({p},{d},{q})')
-    axs[1].set_ylabel('Pickup Count')
+    # Pickup plot
+    axs[1].plot(range(train_st, train_end), pickup_train, label='Training Data', color='blue')
+    axs[1].plot(pickup_model.fitted_values.index + train_st, pickup_model.fitted_values, label='Model Fit', color='green', linestyle='--')
+    axs[1].plot(range(test_st, test_end), pickup_test, label='Test Data', color='orange')
+    axs[1].plot(range(test_st, test_end), pickup_forecast, label='Forecast', color='purple', linestyle='-.')
+    axs[1].set_title(f'Pickup Forecast - Sarima(1,0,1)')
     axs[1].legend()
     axs[1].grid(True, alpha=0.3)
 
-    # Add vertical line to mark where train data ends for main plots
-    for ax in axs[:2]:
-        ax.axvline(x=train_end, color='gray', linestyle='--', alpha=0.5)
-        ax.annotate('End of Training', xy=(train_end, ax.get_ylim()[1]*0.85),
-                   xytext=(train_end+2, ax.get_ylim()[1]*0.85),
-                   arrowprops=dict(facecolor='gray', shrink=0.05, width=1, headwidth=6),
-                   fontsize=9, horizontalalignment='left')
-
-    # Add text box with metrics for main plots
-    dropoff_text = f"Test Metrics:\nMAE: {dropoff_metrics['MAE']:.2f}\nRMSE: {dropoff_metrics['RMSE']:.2f}"
-    axs[0].text(0.02, 0.05, dropoff_text, transform=axs[0].transAxes, 
-               bbox=dict(facecolor='white', alpha=0.8, boxstyle='round'))
-               
-    pickup_text = f"Test Metrics:\nMAE: {pickup_metrics['MAE']:.2f}\nRMSE: {pickup_metrics['RMSE']:.2f}"
-    axs[1].text(0.02, 0.05, pickup_text, transform=axs[1].transAxes, 
-               bbox=dict(facecolor='white', alpha=0.8, boxstyle='round'))
-    
     # New subplot: Zoomed-in view of the last 20 timesteps of training + test period
     axs[2].set_title('Zoomed View: Last 20 Training Steps + Test Period')
     axs[2].set_xlabel('Time')
@@ -176,38 +149,21 @@ def main():
     zoom_start = train_end - 20  # Last 20 timesteps of training
     zoom_end = test_end  # Including all test data
     
-    # Plot dropoff data (zoomed)
-    axs[2].plot(range(zoom_start, train_end), dropoff_data[zoom_start:train_end], 
-                label='Dropoff Training', color='blue', alpha=0.6)
-    axs[2].plot(range(test_st, test_end), dropoff_test, 
-                label='Dropoff Test', color='blue')
-    axs[2].plot(range(test_st, test_end), forecast_dropoff_test, 
-                label='Dropoff Forecast', color='blue', linestyle='-.')
-                
-    # Plot pickup data (zoomed)
-    axs[2].plot(range(zoom_start, train_end), pickup_data[zoom_start:train_end], 
-                label='Pickup Training', color='green', alpha=0.6)
-    axs[2].plot(range(test_st, test_end), pickup_test, 
-                label='Pickup Test', color='green')
-    axs[2].plot(range(test_st, test_end), forecast_pickup_test, 
-                label='Pickup Forecast', color='green', linestyle='-.')
-    
-    # Add vertical line for end of training in zoomed plot
+    axs[2].plot(range(zoom_start, train_end), dropoff_data[zoom_start:train_end], label='Dropoff Training', color='blue', alpha=0.6)
+    axs[2].plot(range(test_st, test_end), dropoff_test, label='Dropoff Test', color='blue')
+    axs[2].plot(range(test_st, test_end), dropoff_forecast, label='Dropoff Forecast', color='blue', linestyle='-.')
+    axs[2].plot(range(zoom_start, train_end), pickup_data[zoom_start:train_end], label='Pickup Training', color='green', alpha=0.6)
+    axs[2].plot(range(test_st, test_end), pickup_test, label='Pickup Test', color='green')
+    axs[2].plot(range(test_st, test_end), pickup_forecast, label='Pickup Forecast', color='green', linestyle='-.')
     axs[2].axvline(x=train_end, color='red', linestyle='--', alpha=0.5)
-    axs[2].annotate('End of Training', xy=(train_end, axs[2].get_ylim()[1]*0.9),
-                   xytext=(train_end+0.5, axs[2].get_ylim()[1]*0.9),
-                   arrowprops=dict(facecolor='red', shrink=0.05, width=1, headwidth=6),
-                   fontsize=9, horizontalalignment='left')
-    
+    axs[2].annotate('End of Training', xy=(train_end, axs[2].get_ylim()[1]*0.9), xytext=(train_end+0.5, axs[2].get_ylim()[1]*0.9),
+                   arrowprops=dict(facecolor='red', shrink=0.05, width=1, headwidth=6), fontsize=9, horizontalalignment='left')
     axs[2].grid(True, alpha=0.3)
     axs[2].legend(loc='upper left')
-        
-    # Adjust layout
-    model_str = f"ARIMA({p},{d},{q})"
-    plt.suptitle(f"{model_str} Model with Test Period Forecast")
+
     plt.tight_layout()
-    plt.subplots_adjust(top=0.95, hspace=0.3)  # Adjust space for title and between subplots
-    
+    plt.subplots_adjust(top=0.95)
+    plt.suptitle(f'Sarima Forecasts (Dropoff & Pickup)', fontsize=14)
     plt.show()
 
 if __name__ == "__main__":

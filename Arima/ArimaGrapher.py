@@ -41,7 +41,7 @@ def main():
     test_end = test_st + forecast_hours
     test_period_length = test_end - test_st
 
-    value_range = [0, 1, 2, 3, 4]
+    value_range = [0, 1, 2, 3]
 
     # --- DROP-OFF MODEL ---
     print("Optimizing Dropoff model...")
